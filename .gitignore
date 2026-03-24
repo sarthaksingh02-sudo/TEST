@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Python
+backend/venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment
+.env
+backend/.env
+
+# Build
+frontend/dist/
+*.log
+
+# Database
+*.db
+*.sqlite3
+backend/chroma_db/
+
+# Temp
+*.tmp
