@@ -48,6 +48,10 @@ graph TD
 
     PDF((Unstructured PDFs)) --> UI
     Images((Medical Scans/RX)) --> UI
+    
+    %% Cross-System Flow
+    UI <-->|REST APIs & File Streams| API
+    
     Tabular --> Mongo
     Chroma <--> Mongo
 ```
