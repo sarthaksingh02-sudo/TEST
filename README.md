@@ -1,3 +1,5 @@
+![alt text](image.png)
+
 # 🧬 ETHCR4CK — Clinical Intelligence Research Platform
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
@@ -30,7 +32,7 @@
 ## 🏗 System Architecture
 
 ```mermaid
-graph TD
+graph LR
     subgraph "Immersive Frontend Engine"
         UI[React 19 + Vite] -->|Cinematic 3D WebGL| R3F[React Three Fiber & Drei]
         UI -->|Flow Logic| RF[React Flow]
