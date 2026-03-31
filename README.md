@@ -137,7 +137,7 @@ Remove-Item -Recurse -Force backend\data\chroma_db; Remove-Item -Recurse -Force 
 
 ---
 
-## 🛠 Tech Stack Stack
+## 🛠 Tech Stack 
 *   **AI Core:** Gemini 2.5 Flash (1M+ context window) & Microsoft TrOCR
 *   **Data Layer:** MongoDB (Sessions/History) & ChromaDB (Vector Search)
 *   **Reporting:** jsPDF & docx-js
