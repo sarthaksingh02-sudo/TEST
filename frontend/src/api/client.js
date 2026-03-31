@@ -2,7 +2,7 @@ import axios from 'axios'
 
 const api = axios.create({
   baseURL: '/api',
-  timeout: 120000,
+  timeout: 300000, // 5 minutes (Increased for heavy ML OCR processing)
 })
 
 // Upload a PDF to a session
@@ -19,24 +19,12 @@ export const uploadPDF = (file, sessionId = 'default', onProgress) => {
 export const queryDocuments = (question, sessionId = 'default') =>
   api.post('/query', { question, session_id: sessionId })
 
-// Get filtered graph (POST with filters)
-export const getFilteredGraph = (sessionId = 'default', filters = {}) =>
-  api.post(`/graph/${sessionId}`, {
-    entity_types: filters.entity_types || null,
-    specific_nodes: filters.specific_nodes || null,
-    min_connection_strength: filters.min_connection_strength || 1,
-    preset: filters.preset || 'default',
-  })
+// Extract structured table
+export const extractTableParameters = (sessionId = 'default', parameters = []) =>
+  api.post(`/table/${sessionId}`, { parameters })
 
-// Legacy: get graph (unfiltered)
-export const getGraph = () => api.get('/graph')
-
-// Search nodes in a session
-export const searchNodes = (sessionId = 'default', query = '') =>
-  api.get(`/graph/${sessionId}/nodes?q=${encodeURIComponent(query)}`)
-
-export const addAdHocNode = (sessionId = 'default', query = '') =>
-  api.post(`/graph/${sessionId}/ad_hoc`, { query })
+export const autoSuggestParameters = (sessionId = 'default') =>
+  api.get(`/table/${sessionId}/auto-suggest`)
 
 // Session management
 export const createSession = (name, description = '') =>
@@ -47,3 +35,15 @@ export const listSessions = () => api.get('/sessions')
 export const getSession = (sessionId) => api.get(`/session/${sessionId}`)
 
 export const deleteSession = (sessionId) => api.delete(`/session/${sessionId}`)
+
+export const clearSessionDocuments = (sessionId) => api.delete(`/session/${sessionId}/documents`)
+
+// Chat history (MongoDB-backed persistence)
+export const getChatHistory = (sessionId, limit = 50) =>
+  api.get(`/chat-history/${sessionId}?limit=${limit}`)
+
+export const clearChatHistory = (sessionId) =>
+  api.delete(`/chat-history/${sessionId}`)
+
+// Health check (includes DB + ML model status)
+export const getHealthStatus = () => api.get('/health')

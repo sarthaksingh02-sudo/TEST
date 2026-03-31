@@ -336,6 +336,8 @@ body::after {
   flex-direction: column;
   background-color: transparent;
   background-image: radial-gradient(circle at 50% -20%, rgba(99, 102, 241, 0.15) 0%, transparent 60%);
+  position: relative;
+  z-index: 10;
 }
 
 /* Header */

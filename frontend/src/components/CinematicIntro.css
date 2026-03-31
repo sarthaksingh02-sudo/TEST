@@ -65,6 +65,39 @@
   box-shadow: 0 0 40px rgba(255, 153, 51, 0.3);
 }
 
+.start-btn.disabled:hover {
+  transform: none;
+  box-shadow: none;
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* ── LOADING BAR ──────────────────────────────────────────── */
+.start-loader {
+  width: 200px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 30px auto 0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.start-loader-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #e68a00, #ffcc80);
+  transition: width 0.3s ease-out;
+  border-radius: 2px;
+}
+
+.start-progress-text {
+  font-family: 'Audiowide', sans-serif;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.3);
+  letter-spacing: 0.2em;
+  margin-top: 8px;
+  text-align: center;
+}
+
 /* ── SCENE INDICATOR DOTS ─────────────────────────────────── */
 .scene-indicators {
   position: absolute;
@@ -142,7 +175,7 @@
 .cinematic-title {
   font-family: 'Audiowide', sans-serif;
   color: #ffffff;
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   letter-spacing: 0.15em;
   text-transform: uppercase;
   margin: 0 0 8px 0;
@@ -150,7 +183,7 @@
 }
 
 .cinematic-title.hero-title {
-  font-size: 4rem;
+  font-size: 4.5rem;
   letter-spacing: 0.25em;
   margin-bottom: 12px;
   background: linear-gradient(180deg, #ffffff 40%, rgba(255,200,120,0.9) 100%);
@@ -182,7 +215,7 @@
 .cinematic-body {
   font-family: 'Audiowide', sans-serif;
   color: rgba(255, 255, 255, 0.88);
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   line-height: 1.8;
   letter-spacing: 0.02em;
   margin: 12px 0 0 0;

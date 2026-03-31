@@ -20,12 +20,13 @@ questions using the provided medical document excerpts. Follow these rules stric
 5. Never guess. Never fabricate. Every claim must trace to the context provided."""
 
 
-def answer_clinical_query(query: str, top_k: int = 5) -> Dict:
+def answer_clinical_query(query: str, top_k: int = 5, session_id: str = "default") -> Dict:
     """
     Retrieve relevant chunks → build grounded prompt → call Gemini → parse sources.
     Returns: {answer, sources, raw_chunks}
     """
-    chunks = retrieve_relevant_chunks(query, top_k=top_k)
+    collection_name = f"session_{session_id}"
+    chunks = retrieve_relevant_chunks(query, top_k=top_k, collection_name=collection_name)
 
     if not chunks:
         return {

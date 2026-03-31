@@ -2,12 +2,12 @@ import { useState, useCallback, useEffect } from 'react'
 import PDFUploader from './components/PDFUploader'
 import QueryBox from './components/QueryBox'
 import AnswerCard from './components/AnswerCard'
-import EntityPanel from './components/EntityPanel'
-import GraphView from './components/GraphView'
+import TableView from './components/TableView'
 import SessionManager from './components/SessionManager'
 import SciFiBackground from './components/SciFiBackground'
 import CinematicIntro from './components/CinematicIntro'
-import { uploadPDF, queryDocuments, getFilteredGraph, getSession } from './api/client'
+import ChatHistory from './components/ChatHistory'
+import { uploadPDF, queryDocuments, getSession, getChatHistory } from './api/client'
 import './App.css'
 
 export default function App() {
@@ -15,72 +15,49 @@ export default function App() {
   const [enteredPortal, setEnteredPortal] = useState(false)
   const [cinematicDone, setCinematicDone] = useState(false)
   const [cinematicCamera, setCinematicCamera] = useState(null)
-  const [activeTab, setActiveTab] = useState('graph')
+  const [loadProgress, setLoadProgress] = useState(0)
+  const [activeTab, setActiveTab] = useState('table')
   const [uploadStatus, setUploadStatus] = useState(null)
   const [queryResult, setQueryResult] = useState(null)
   const [queryLoading, setQueryLoading] = useState(false)
   const [docCount, setDocCount] = useState(0)
+  const [documentList, setDocumentList] = useState([])
+  const [chatHistory, setChatHistory] = useState([])
+  const [isNight, setIsNight] = useState(() => {
+    const h = new Date().getHours()
+    return h < 7 || h >= 18
+  })
 
-  // Graph state
-  const [graphNodes, setGraphNodes] = useState([])
-  const [graphEdges, setGraphEdges] = useState([])
-  const [availableNodes, setAvailableNodes] = useState([])
-  const [totalEntities, setTotalEntities] = useState(0)
-  const [totalRelations, setTotalRelations] = useState(0)
-
-  // Entity sidebar state
-  const [entities, setEntities] = useState([])
-
-  // Fetch graph with filters
-  const fetchGraph = useCallback(
-    async (filters = { preset: 'default' }, overrideSessionId = null) => {
-      try {
-        const sid = overrideSessionId || sessionId
-        const res = await getFilteredGraph(sid, filters)
-        setGraphNodes(res.data.nodes)
-        setGraphEdges(res.data.edges)
-        setAvailableNodes(res.data.available_nodes || [])
-        setTotalEntities(res.data.total_nodes)
-        setTotalRelations(res.data.total_edges)
-
-        // Build entity list for sidebar from available_nodes
-        if (res.data.available_nodes) {
-          setEntities(
-            res.data.available_nodes.map((n) => ({
-              text: n.label,
-              label: n.type,
-              normalized_text: n.id,
-            }))
-          )
-        }
-      } catch (err) {
-        console.error('Graph fetch error:', err)
-      }
-    },
-    [sessionId]
-  )
+  // Load chat history for a session
+  const loadChatHistory = async (sid) => {
+    try {
+      const res = await getChatHistory(sid)
+      setChatHistory(res.data.messages || [])
+    } catch (err) {
+      console.error('Failed to load chat history', err)
+      setChatHistory([])
+    }
+  }
 
   // Switch Session
   const switchSession = async (newSessionId) => {
     setSessionId(newSessionId)
     // wipe current state
-    setGraphNodes([])
-    setGraphEdges([])
-    setAvailableNodes([])
-    setEntities([])
-    setTotalEntities(0)
-    setTotalRelations(0)
     setQueryResult(null)
     setUploadStatus(null)
 
     try {
       const res = await getSession(newSessionId)
       setDocCount(res.data.documents.length)
-      await fetchGraph({ preset: 'default' }, newSessionId)
+      setDocumentList(res.data.documents)
     } catch (err) {
       console.error('Failed to load session details', err)
       setDocCount(0)
+      setDocumentList([])
     }
+
+    // Load chat history from MongoDB
+    await loadChatHistory(newSessionId)
   }
 
   // Load default session on mount
@@ -100,12 +77,11 @@ export default function App() {
         success: true,
         filename: res.data.filename,
         chunks: res.data.chunks_extracted,
-        entities: res.data.entities_found,
+        entities: 0,
         message: res.data.message,
       })
       setDocCount((c) => c + 1)
-      // Fetch graph after upload
-      await fetchGraph({ preset: 'default' })
+      setDocumentList((prev) => Array.from(new Set([...prev, res.data.filename])))
     } catch (err) {
       setUploadStatus({
         error: err.response?.data?.detail || err.message,
@@ -114,56 +90,23 @@ export default function App() {
   }
 
   // Handle query
-  const handleQuery = async (question, generateGraph = false) => {
+  const handleQuery = async (question) => {
     setQueryLoading(true)
+    setActiveTab('analysis')
     try {
       const res = await queryDocuments(question, sessionId)
       setQueryResult(res.data)
-      
-      if (generateGraph && res.data.entities && res.data.entities.length > 0) {
-        // Collect exact matching node IDs based on the extracted entities
-        const entLower = res.data.entities.map(e => e.toLowerCase())
-        const matchedNodeIds = availableNodes
-          .filter(n => entLower.includes(n.id) || entLower.includes(n.label.toLowerCase()))
-          .map(n => n.id)
-          
-        if (matchedNodeIds.length > 0) {
-          await fetchGraph({ specific_nodes: matchedNodeIds, min_connection_strength: 1 })
-        }
-        setActiveTab('graph')
-      } else {
-        setActiveTab('analysis')
-      }
+
+      // Refresh chat history from MongoDB (newly saved interaction)
+      await loadChatHistory(sessionId)
     } catch (err) {
       setQueryResult({
         answer: `Error: ${err.response?.data?.detail || err.message}`,
         sources: [],
         entities: [],
       })
-      setActiveTab('analysis')
     } finally {
       setQueryLoading(false)
-    }
-  }
-
-  // Handle filter change from GraphControlPanel
-  const handleFilterChange = async (filters) => {
-    await fetchGraph(filters)
-  }
-
-  // Handle ad-hoc dynamic node creation
-  const handleAdHocSearch = async (query) => {
-    try {
-      const { addAdHocNode } = await import('./api/client')
-      const res = await addAdHocNode(sessionId, query)
-      if (res.data.status === 'success') {
-        await fetchGraph({ preset: 'default' })
-        return { success: true, node_id: res.data.node_id }
-      } else {
-        return { success: false, error: res.data.message }
-      }
-    } catch (err) {
-      return { success: false, error: err.response?.data?.message || err.message }
     }
   }
 
@@ -175,6 +118,8 @@ export default function App() {
         onExitPortal={() => setEnteredPortal(false)}
         isPortalActive={enteredPortal}
         cinematicTarget={cinematicDone ? null : cinematicCamera}
+        onLoadProgress={setLoadProgress}
+        isNight={isNight}
       />
 
       {/* Cinematic Intro Overlay */}
@@ -183,36 +128,65 @@ export default function App() {
           key={`cinematic-${cinematicDone}`}
           onCinematicEnd={() => setCinematicDone(true)}
           setCameraTarget={setCinematicCamera}
+          loadProgress={loadProgress}
         />
       )}
 
-      {/* Replay button — visible in office view when cinematic is done and not in portal */}
+      {/* Replay and Theme buttons — visible in office view when cinematic is done and not in portal */}
       {cinematicDone && !enteredPortal && (
-        <button 
-          onClick={() => { setEnteredPortal(false); setCinematicDone(false); setCinematicCamera(null); }}
-          style={{
-            position: 'fixed',
-            bottom: '30px',
-            right: '30px',
-            zIndex: 50,
-            fontFamily: "'Audiowide', sans-serif",
-            background: 'rgba(0,0,0,0.5)',
-            backdropFilter: 'blur(10px)',
-            color: 'rgba(255,255,255,0.7)',
-            border: '1px solid rgba(255,255,255,0.15)',
-            padding: '10px 22px',
-            borderRadius: '8px',
-            fontSize: '11px',
-            letterSpacing: '0.15em',
-            cursor: 'pointer',
-            textTransform: 'uppercase',
-            transition: 'all 0.3s ease',
-          }}
-          onMouseOver={(e) => { e.target.style.background = 'rgba(0,0,0,0.7)'; e.target.style.color = '#fff'; e.target.style.borderColor = 'rgba(255,255,255,0.4)'; }}
-          onMouseOut={(e) => { e.target.style.background = 'rgba(0,0,0,0.5)'; e.target.style.color = 'rgba(255,255,255,0.7)'; e.target.style.borderColor = 'rgba(255,255,255,0.15)'; }}
-        >
-          ↺ REPLAY INTRO
-        </button>
+        <>
+          <button 
+            onClick={() => { setEnteredPortal(false); setCinematicDone(false); setCinematicCamera(null); }}
+            style={{
+              position: 'fixed',
+              bottom: '30px',
+              right: '30px',
+              zIndex: 50,
+              fontFamily: "'Audiowide', sans-serif",
+              background: 'rgba(0,0,0,0.5)',
+              backdropFilter: 'blur(10px)',
+              color: 'rgba(255,255,255,0.7)',
+              border: '1px solid rgba(255,255,255,0.15)',
+              padding: '10px 22px',
+              borderRadius: '8px',
+              fontSize: '11px',
+              letterSpacing: '0.15em',
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              transition: 'all 0.3s ease',
+            }}
+            onMouseOver={(e) => { e.target.style.background = 'rgba(0,0,0,0.7)'; e.target.style.color = '#fff'; e.target.style.borderColor = 'rgba(255,255,255,0.4)'; }}
+            onMouseOut={(e) => { e.target.style.background = 'rgba(0,0,0,0.5)'; e.target.style.color = 'rgba(255,255,255,0.7)'; e.target.style.borderColor = 'rgba(255,255,255,0.15)'; }}
+          >
+            ↺ REPLAY INTRO
+          </button>
+          
+          <button 
+            onClick={() => setIsNight(!isNight)}
+            style={{
+              position: 'fixed',
+              bottom: '30px',
+              left: '30px',
+              zIndex: 50,
+              fontFamily: "'Audiowide', sans-serif",
+              background: 'rgba(0,0,0,0.5)',
+              backdropFilter: 'blur(10px)',
+              color: 'rgba(255,255,255,0.7)',
+              border: '1px solid rgba(255,255,255,0.15)',
+              padding: '10px 22px',
+              borderRadius: '8px',
+              fontSize: '11px',
+              letterSpacing: '0.15em',
+              cursor: 'pointer',
+              textTransform: 'uppercase',
+              transition: 'all 0.3s ease',
+            }}
+            onMouseOver={(e) => { e.target.style.background = 'rgba(0,0,0,0.7)'; e.target.style.color = '#fff'; e.target.style.borderColor = 'rgba(255,255,255,0.4)'; }}
+            onMouseOut={(e) => { e.target.style.background = 'rgba(0,0,0,0.5)'; e.target.style.color = 'rgba(255,255,255,0.7)'; e.target.style.borderColor = 'rgba(255,255,255,0.15)'; }}
+          >
+            {isNight ? "☼ SWITCH TO DAY" : "☾ SWITCH TO NIGHT"}
+          </button>
+        </>
       )}
 
       {/* Main clinical dashboard - completely hidden and unclickable until the 3D portal zoom engages */}
@@ -257,6 +231,9 @@ export default function App() {
           {docCount > 0 && (
             <span className="badge badge-indigo">✓ {docCount} doc{docCount > 1 ? 's' : ''} loaded</span>
           )}
+          {chatHistory.length > 0 && (
+            <span className="badge badge-teal">💬 {chatHistory.length} interactions</span>
+          )}
           <span className="status-indicator">
             <span className="status-dot" />
             System Online
@@ -270,16 +247,29 @@ export default function App() {
         <aside className="sidebar">
           <SessionManager currentSessionId={sessionId} onSessionChange={switchSession} />
 
-          <div className="sidebar-section">
-            <h3 className="section-title">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-              </svg>
-              UPLOAD DOCUMENT
-            </h3>
-            <PDFUploader onUpload={handleUpload} uploadStatus={uploadStatus} />
-          </div>
+          <PDFUploader onUpload={handleUpload} uploadStatus={uploadStatus} />
+
+          {docCount > 0 && (
+            <div className="sidebar-section">
+              <h3 className="section-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                  <polyline points="10 9 9 9 8 9" />
+                </svg>
+                SESSION DOCUMENTS
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {documentList.map((doc, i) => (
+                  <div key={i} style={{ fontSize: '11px', color: 'var(--text-secondary)', background: 'var(--bg-card)', padding: '8px 10px', borderRadius: '4px', border: '1px solid var(--border-primary)', whiteSpace: 'wrap', wordBreak: 'break-all' }}>
+                    <span style={{ color: 'var(--accent-indigo)' }}>✧</span> {doc}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="sidebar-section">
             <h3 className="section-title">
@@ -291,9 +281,6 @@ export default function App() {
             </h3>
             <QueryBox onSubmit={handleQuery} loading={queryLoading} />
           </div>
-
-          {/* Entity panel */}
-          <EntityPanel entities={entities} />
         </aside>
 
         {/* Content area */}
@@ -301,29 +288,36 @@ export default function App() {
           {/* Tab bar */}
           <div className="tab-bar">
             <button
-              className={`tab-btn ${activeTab === 'graph' ? 'active' : ''}`}
-              onClick={() => setActiveTab('graph')}
+              className={`tab-btn ${activeTab === 'table' ? 'active' : ''}`}
+              onClick={() => setActiveTab('table')}
             >
-              ◇ Knowledge Graph
+              ◇ Tabular Extraction
             </button>
             <button
               className={`tab-btn ${activeTab === 'analysis' ? 'active' : ''}`}
               onClick={() => setActiveTab('analysis')}
             >
               ◆ Analysis
+              {chatHistory.length > 0 && (
+                <span style={{
+                  background: 'var(--accent-indigo)',
+                  color: '#fff',
+                  fontSize: '10px',
+                  padding: '1px 6px',
+                  borderRadius: '10px',
+                  marginLeft: '6px',
+                  fontWeight: 700,
+                }}>
+                  {chatHistory.length}
+                </span>
+              )}
             </button>
           </div>
 
           {/* Tab content */}
-          {activeTab === 'graph' && (
+          {activeTab === 'table' && (
             <div>
-              <GraphView
-                initialNodes={graphNodes}
-                initialEdges={graphEdges}
-                availableNodes={availableNodes}
-                onFilterChange={handleFilterChange}
-                onAdHocSearch={handleAdHocSearch}
-              />
+              <TableView sessionId={sessionId} />
               {/* Stats bar */}
               {docCount > 0 && (
                 <div
@@ -347,18 +341,10 @@ export default function App() {
                   </div>
                   <div>
                     <span style={{ fontSize: '20px', fontWeight: 700, color: 'var(--accent-teal)' }}>
-                      {totalEntities}
+                      {chatHistory.length}
                     </span>
                     <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>
-                      Entities
-                    </span>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '20px', fontWeight: 700, color: 'var(--accent-amber)' }}>
-                      {totalRelations}
-                    </span>
-                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>
-                      Relations
+                      Interactions
                     </span>
                   </div>
                 </div>
@@ -368,9 +354,15 @@ export default function App() {
 
           {activeTab === 'analysis' && (
             <div>
-              {queryResult ? (
+              {/* Persistent chat history from MongoDB */}
+              <ChatHistory messages={chatHistory} loading={queryLoading} />
+
+              {/* Latest query result (kept for backward compat) */}
+              {queryResult && chatHistory.length === 0 && (
                 <AnswerCard result={queryResult} />
-              ) : (
+              )}
+
+              {!queryResult && chatHistory.length === 0 && (
                 <div
                   className="glass-card"
                   style={{

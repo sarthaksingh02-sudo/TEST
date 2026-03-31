@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 # Multi-key support: comma-separated keys for round-robin
 _raw_keys = os.getenv("GEMINI_API_KEYS", os.getenv("GEMINI_API_KEY", ""))
@@ -12,6 +12,13 @@ CHROMA_DB_PATH = os.getenv("CHROMA_DB_PATH", "./data/chroma_db")
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "./data/sample_pdfs")
 GEMINI_MODEL = "gemini-2.5-flash"
 EMBED_MODEL = "gemini-embedding-001"
+
+# MongoDB
+MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+MONGODB_DB_NAME = os.getenv("MONGODB_DB_NAME", "ethcr4ck")
+
+# TrOCR handwriting recognition
+TROCR_ENABLED = os.getenv("TROCR_ENABLED", "1") == "1"
 
 # Chunking
 CHUNK_SIZE = 2000

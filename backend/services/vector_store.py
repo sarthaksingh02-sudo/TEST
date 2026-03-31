@@ -4,7 +4,7 @@
 import time
 import chromadb
 from typing import List, Dict
-from config import CHROMA_DB_PATH, GEMINI_API_KEYS, EMBED_BATCH_SIZE, EMBED_BATCH_DELAY
+from config import CHROMA_DB_PATH, GEMINI_API_KEYS, EMBED_BATCH_SIZE, EMBED_BATCH_DELAY, EMBED_MODEL
 
 from google import genai
 
@@ -26,13 +26,15 @@ def _get_next_client() -> genai.Client:
 def _embed_with_retry(contents, max_retries=None):
     """Call embed_content, rotating keys on failure."""
     max_retries = max_retries or len(_clients)
+    if not _clients:
+        raise RuntimeError("No Gemini API clients available. Check your GEMINI_API_KEYS in .env.")
     last_error = None
 
     for attempt in range(max_retries):
         gc = _get_next_client()
         try:
             response = gc.models.embed_content(
-                model="gemini-embedding-001",
+                model=EMBED_MODEL,
                 contents=contents,
             )
             return response
@@ -54,6 +56,8 @@ def _embed_with_retry(contents, max_retries=None):
 def _generate_with_retry(model, contents, max_retries=None):
     """Call generate_content, rotating keys on failure."""
     max_retries = max_retries or len(_clients)
+    if not _clients:
+        raise RuntimeError("No Gemini API clients available. Check your GEMINI_API_KEYS in .env.")
     last_error = None
 
     for attempt in range(max_retries):

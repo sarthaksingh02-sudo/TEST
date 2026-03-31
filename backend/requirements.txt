@@ -10,3 +10,5 @@ sqlalchemy
 pydantic
 python-dotenv
 httpx
+pymongo
+Pillow

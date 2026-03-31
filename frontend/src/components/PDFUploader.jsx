@@ -28,8 +28,10 @@ export default function PDFUploader({ onUpload, uploadStatus }) {
   }
 
   const handleFile = async (file) => {
-    if (!file.name.endsWith('.pdf')) {
-      setError('Only PDF files are accepted')
+    const validExts = ['.pdf', '.jpg', '.jpeg', '.png'];
+    const lowerName = file.name.toLowerCase();
+    if (!validExts.some(ext => lowerName.endsWith(ext))) {
+      setError('Only PDF and Image files (JPG/PNG) are accepted')
       return
     }
 
@@ -86,7 +88,7 @@ export default function PDFUploader({ onUpload, uploadStatus }) {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf"
+          accept=".pdf,.jpg,.jpeg,.png"
           onChange={handleFileSelect}
           style={{ display: 'none' }}
         />
@@ -95,7 +97,7 @@ export default function PDFUploader({ onUpload, uploadStatus }) {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
             <div className="spinner" />
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-              Processing PDF... {progress > 0 ? `${progress}%` : 'extracting entities'}
+              Processing File... {progress > 0 ? `${progress}%` : 'extracting AI insights'}
             </p>
             <div style={{
               width: '100%', height: '3px', borderRadius: '2px',
@@ -124,10 +126,10 @@ export default function PDFUploader({ onUpload, uploadStatus }) {
               </svg>
             </div>
             <p style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '4px' }}>
-              Drop PDF here or click to browse
+              Drop PDF or Scans here (click to browse)
             </p>
             <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-              Medical papers, clinical trials, drug studies
+              Medical PDFs, X-Ray reports, Handwritten Prescriptions (JPG/PNG)
             </p>
           </>
         )}

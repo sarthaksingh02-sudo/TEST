@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './CinematicIntro.css';
 
 // Top-right overview — desk, laptop, chair all visible
-const DESK_CAMERA = { pos: [5, 4, 6], look: [0, 0, 0] };
+const DESK_CAMERA = { pos: [4, 3.5, 5], look: [0, 0, 0] };
 // After back-to-office — same angle, slightly closer
 const CHAIR_CAMERA = { pos: [4, 3.5, 5], look: [0, 0, 0] };
 
@@ -11,7 +11,7 @@ const SCENES = [
   {
     id: 'title',
     camera: { pos: [6, 5, 12], look: [0, 0, 0] },
-    duration: 6000,
+    duration: 10000,
     title: 'ETHCR4CK',
     subtitle: 'CLINICAL INTELLIGENCE SYSTEM',
     text: '',
@@ -19,7 +19,7 @@ const SCENES = [
   {
     id: 'problem-intro',
     camera: { pos: [5, 3, 7], look: [0, 1, 0] },
-    duration: 6000,
+    duration: 10000,
     title: 'THE PROBLEM',
     subtitle: '',
     text: 'Three critical failures are costing lives in modern medicine.',
@@ -28,7 +28,7 @@ const SCENES = [
   {
     id: 'problem-1',
     camera: { pos: [-5, 3, 3], look: [-3, 2, -2] },
-    duration: 6000,
+    duration: 10000,
     title: 'DATA ENTRAPMENT',
     subtitle: '01',
     text: '80% of clinical evidence is trapped in dead formats. PDFs, faxes, scanned reports. Decades of life-saving research, stranded and inaccessible to AI analysis.',
@@ -36,7 +36,7 @@ const SCENES = [
   {
     id: 'problem-2',
     camera: { pos: [-2, 4.5, -2], look: [0, 1, 0] },
-    duration: 6000,
+    duration: 10000,
     title: 'INFORMATION OVERLOAD',
     subtitle: '02',
     text: 'Medical knowledge doubles every 73 days. Clinicians drown in data, forced to rely on outdated protocols. Burnout rises. Patient safety falls.',
@@ -44,7 +44,7 @@ const SCENES = [
   {
     id: 'problem-3',
     camera: { pos: [-4, 1.5, 6], look: [-1, 2, -1] },
-    duration: 6000,
+    duration: 10000,
     title: 'BLACK BOX AI',
     subtitle: '03',
     text: 'Current AI operates without transparency. No sources. No proof. Without traceability, artificial intelligence remains a risky experiment, not a trusted clinical partner.',
@@ -52,7 +52,7 @@ const SCENES = [
   {
     id: 'solution-intro',
     camera: { pos: [0, 6, 8], look: [0, 0, 0] },
-    duration: 6000,
+    duration: 10000,
     title: 'THE SOLUTION',
     subtitle: 'ETHCR4CK',
     text: 'A three-stage intelligence pipeline that transforms dead data into verified clinical insight.',
@@ -61,7 +61,7 @@ const SCENES = [
   {
     id: 'solution-1',
     camera: { pos: [4, 2.5, 3], look: [1, 1, -1] },
-    duration: 6000,
+    duration: 10000,
     title: 'STRUCTURED KNOWLEDGE',
     subtitle: '01',
     text: 'A Medical NLP pipeline extracts clinical entities from dead PDFs. Drugs, diseases, genes. Static documents become a living, structured knowledge base.',
@@ -69,7 +69,7 @@ const SCENES = [
   {
     id: 'solution-2',
     camera: { pos: [2, 1.5, 1.5], look: [0, 0.8, -1] },
-    duration: 6000,
+    duration: 10000,
     title: 'FACT-ANCHORED RESPONSES',
     subtitle: '02',
     text: 'Every AI response is anchored to retrieved clinical facts. No hallucinations. No guessing. Verified insights that reduce clinician risk and burnout.',
@@ -77,7 +77,7 @@ const SCENES = [
   {
     id: 'solution-3',
     camera: { pos: [3, 3.5, 5], look: [0, 1, 0] },
-    duration: 6000,
+    duration: 10000,
     title: '100% TRACEABILITY',
     subtitle: '03',
     text: 'Every recommendation links directly to its source evidence. File, page, paragraph. The black box is eliminated. Doctors get the proof they need to trust AI.',
@@ -86,7 +86,7 @@ const SCENES = [
     id: 'portal',
     // Transition to desk overview from behind chair
     camera: DESK_CAMERA,
-    duration: 6000,
+    duration: 10000,
     title: 'ENTER THE SYSTEM',
     subtitle: '',
     text: 'Click the laptop to begin.',
@@ -140,7 +140,7 @@ function TypewriterText({ text, speed = 35, onComplete, audioCtx }) {
 }
 
 // ─── MAIN CINEMATIC INTRO COMPONENT ─────────────────────────
-export default function CinematicIntro({ onCinematicEnd, setCameraTarget }) {
+export default function CinematicIntro({ onCinematicEnd, setCameraTarget, loadProgress = 0 }) {
   const [started, setStarted] = useState(false);
   const [currentScene, setCurrentScene] = useState(0);
   const [textComplete, setTextComplete] = useState(false);
@@ -220,14 +220,26 @@ export default function CinematicIntro({ onCinematicEnd, setCameraTarget }) {
 
   // ── START SCREEN ──
   if (!started) {
+    const loaded = loadProgress >= 100;
     return (
       <div className="cinematic-overlay start-screen">
         <div className="start-content">
           <h1 className="start-title">ETHCR4CK</h1>
           <p className="start-sub">CLINICAL INTELLIGENCE SYSTEM</p>
-          <button className="start-btn" onClick={handleStart}>
-            START
+          <button 
+            className={`start-btn ${!loaded ? 'disabled' : ''}`} 
+            onClick={loaded ? handleStart : undefined}
+            style={!loaded ? { opacity: 0.3, cursor: 'default' } : {}}
+          >
+            {loaded ? 'START' : 'LOADING...'}
           </button>
+          <div className="start-loader">
+            <div 
+              className="start-loader-fill" 
+              style={{ width: `${loadProgress}%` }} 
+            />
+          </div>
+          <p className="start-progress-text">{Math.round(loadProgress)}%</p>
         </div>
       </div>
     );

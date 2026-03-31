@@ -4,10 +4,9 @@ import shutil
 import os
 from config import UPLOAD_DIR
 from services.pdf_extractor import extract_chunks
-from services.nlp_pipeline import extract_entities_from_chunks
+from services.image_extractor import extract_image_text
 from services.vector_store import store_chunks
-from services.knowledge_graph import get_or_create_graph
-from routers.session import sessions
+from services import database as db
 from models.schemas import UploadResponse
 
 router = APIRouter(prefix="/api", tags=["upload"])
@@ -20,46 +19,65 @@ async def upload_pdf(
     file: UploadFile = File(...),
     session_id: str = Query(default="default"),
 ):
-    """Upload a medical PDF into a session for processing."""
-    if not file.filename.lower().endswith(".pdf"):
-        raise HTTPException(400, "Only PDF files accepted")
+    """Upload a medical file into a session for processing (PDF, JPG, PNG)."""
+    ext = file.filename.lower()
+    if not (
+        ext.endswith(".pdf")
+        or ext.endswith(".jpg")
+        or ext.endswith(".jpeg")
+        or ext.endswith(".png")
+    ):
+        raise HTTPException(400, "Only PDF, JPG, and PNG files accepted")
+
+    # Ensure session exists in MongoDB
+    session = db.get_session(session_id)
+    if not session:
+        db.create_session(session_id, f"Session {session_id}", "Auto-created on upload")
 
     save_path = Path(UPLOAD_DIR) / f"{session_id}_{file.filename}"
     with open(save_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
     try:
-        chunks = extract_chunks(str(save_path))
+        if ext.endswith(".pdf"):
+            chunks = extract_chunks(str(save_path))
+            file_type = "pdf"
+        else:  # image
+            chunks = extract_image_text(str(save_path))
+            file_type = "image"
+
         if not chunks:
             raise HTTPException(
                 400,
-                "No text could be extracted from the PDF.",
+                f"No text could be extracted from {file.filename}.",
             )
 
-        entities = extract_entities_from_chunks(chunks)
+        for chunk in chunks:
+            chunk["source"] = file.filename
+
         store_chunks(chunks, collection_name=f"session_{session_id}")
 
-        # Add to session graph (accumulates across uploads)
-        kg = get_or_create_graph(session_id)
-        kg.build_from_chunks_and_entities(chunks, entities)
+        # Update session in MongoDB
+        db.add_document_to_session(session_id, file.filename)
 
-        # Update session metadata
-        if session_id in sessions:
-            if file.filename not in sessions[session_id]["documents"]:
-                sessions[session_id]["documents"].append(file.filename)
-            sessions[session_id]["total_entities"] = len(kg.graph.nodes)
+        # Save document metadata
+        db.save_document_metadata(
+            session_id=session_id,
+            filename=file.filename,
+            file_type=file_type,
+            chunks_extracted=len(chunks),
+            extraction_method="gemini-vision+trocr" if file_type == "image" else "pymupdf",
+        )
 
         return UploadResponse(
             filename=file.filename,
             chunks_extracted=len(chunks),
-            entities_found=len(entities),
+            entities_found=0,
             message=(
                 f"Added {file.filename} to session '{session_id}'. "
-                f"Graph now has {len(kg.graph.nodes)} entities, "
-                f"{len(kg.graph.edges)} relationships."
             ),
         )
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, f"Error processing PDF: {str(e)}")
+        raise HTTPException(500, f"Error processing file: {str(e)}")
